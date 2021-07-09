@@ -3,8 +3,19 @@ using UnityEngine.SceneManagement;
 using Random = UnityEngine.Random;
 
 #if UNITY_EDITOR
+using System;
+using System.IO;
 using UnityEditor;
 using UnityEditor.Animations;
+#if VRC_SDK_VRCSDK3
+using VRC.SDK3.Avatars.Components;
+using VRC.SDK3.Editor;
+using VRC.SDKBase.Editor;
+using ExpressionParameters = VRC.SDK3.Avatars.ScriptableObjects.VRCExpressionParameters;
+using ExpressionParameter = VRC.SDK3.Avatars.ScriptableObjects.VRCExpressionParameters.Parameter;
+using ExpressionsMenu = VRC.SDK3.Avatars.ScriptableObjects.VRCExpressionsMenu;
+using ExpressionControl = VRC.SDK3.Avatars.ScriptableObjects.VRCExpressionsMenu.Control;
+#endif
 #endif
 
 namespace GeoTetra.GTAvaCrypt
@@ -36,64 +47,134 @@ namespace GeoTetra.GTAvaCrypt
 #if UNITY_EDITOR
         private readonly AvaCryptController _avaCryptController = new AvaCryptController();
         private readonly AvaCryptMesh _avaCryptMesh = new AvaCryptMesh();
+        const int maxExPropMemory = 128;
+        const string pathParam = "Assets/expressionParam_Encrypted.asset";
+        const string pathMenu = "Assets/expressionMenu_Encrypted.asset";
+        const string pathController = "Assets/expressionAnimator_Encrypted.asset";
+        const string pathDefaultExpressionParameters = "Assets/VRCSDK/Examples3/Expressions Menu/DefaultExpressionParameters.asset";
+        const string pathDefaultExpressionsMenu = "Assets/VRCSDK/Examples3/Expressions Menu/DefaultExpressionsMenu.asset";
+        const string pathDefaultAnimationController = "Assets/VRCSDK/Examples3/Animation/Controllers/vrc_AvatarV3FaceLayer.controller";
+        const string pathAvaCryptMenu = "Assets/AvaterEncryption/VrcExpressions";
+        const string additionalName = "_Encrypted";
 
-        public void ValidateAnimatorController()
+        public void ValidateAnimatorController(GameObject encodedGameObject)
         {
-            AnimatorController controller = GetAnimatorController();
+            if (encodedGameObject.transform.parent != null)
+            {
+                EditorUtility.DisplayDialog("AvaCryptRoot component not on a Root GameObject.",
+                    "The GameObject which the AvaCryptRoot component is placed on must not be the child of any other GameObject.",
+                    "Ok");
+                return;
+            }
+            VRCAvatarDescriptor avatarDescriptor = encodedGameObject.GetComponent<VRCAvatarDescriptor>();
+            if(avatarDescriptor == null)
+            {
+                EditorUtility.DisplayDialog("No Avatar Descriptor","Add Avatar Descriptor to","OK");
+                return;
+            }
+            AnimatorController controller = GetAnimatorController(avatarDescriptor);
 
+            if(!_avaCryptController.AddExpressionParameters(avatarDescriptor)) return;
+            if(!_avaCryptController.AddExpressionsMenu(avatarDescriptor)) return;
             _avaCryptController.ValidateAnimations(gameObject, controller);
             _avaCryptController.ValidateParameters(controller);
             _avaCryptController.ValidateLayers(controller);
         }
 
-        private AnimatorController GetAnimatorController()
+        private AnimatorController GetAnimatorController(VRCAvatarDescriptor avatarDescriptor)
         {
-            if (transform.parent != null)
+            AnimatorController copiedController = null;
+
+            // Backup ExpressionParameters
+            if(avatarDescriptor.expressionParameters != null)
             {
-                EditorUtility.DisplayDialog("AvaCryptRoot component not on a Root GameObject.",
-                    "The GameObject which the AvaCryptRoot component is placed on must not be the child of any other GameObject.",
-                    "Ok");
-                return null;
+                string paramPath = AssetDatabase.GetAssetPath(avatarDescriptor.expressionParameters);
+                ExpressionParameters copiedParam = (ExpressionParameters)Instantiate(avatarDescriptor.expressionParameters);
+                string paramSavePath = Path.GetDirectoryName(paramPath) + "/" + Path.GetFileNameWithoutExtension(paramPath) + additionalName + ".asset";
+                EditorUtility.SetDirty(copiedParam);
+                AssetDatabase.CreateAsset(copiedParam, paramSavePath);
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+                AssetDatabase.ImportAsset(paramSavePath, ImportAssetOptions.ForceUpdate);
+                avatarDescriptor.expressionParameters = (ExpressionParameters)AssetDatabase.LoadAssetAtPath(paramSavePath, typeof(ExpressionParameters));
+            }
+            else
+            {
+                ExpressionParameters defaultParam = (ExpressionParameters)AssetDatabase.LoadAssetAtPath(pathDefaultExpressionParameters, typeof(ExpressionParameters));
+                ExpressionParameters newParam = (ExpressionParameters)GameObject.Instantiate(defaultParam);
+                EditorUtility.SetDirty(newParam);
+                AssetDatabase.CreateAsset(newParam, pathParam);
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+                AssetDatabase.ImportAsset(pathParam, ImportAssetOptions.ForceUpdate);
+                avatarDescriptor.expressionParameters = (ExpressionParameters)AssetDatabase.LoadAssetAtPath(pathParam, typeof(ExpressionParameters));
             }
 
-            Animator animator = GetComponent<Animator>();
-            if (animator == null)
+            // Backup ExpressionsMenu
+            if(avatarDescriptor.expressionsMenu != null)
             {
-                EditorUtility.DisplayDialog("No Animator.",
-                    "Add an animator to the Avatar's root GameObject.",
-                    "Ok");
-                return null;
+                string menuPath = AssetDatabase.GetAssetPath(avatarDescriptor.expressionsMenu);
+                string menuSavePath = Path.GetDirectoryName(menuPath) + "/" + Path.GetFileNameWithoutExtension(menuPath) + additionalName + ".asset";
+                ExpressionsMenu copiedMenu = (ExpressionsMenu)Instantiate(avatarDescriptor.expressionsMenu);
+                EditorUtility.SetDirty(copiedMenu);
+                AssetDatabase.CreateAsset(copiedMenu, menuSavePath);
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+                AssetDatabase.ImportAsset(menuSavePath, ImportAssetOptions.ForceUpdate);
+                avatarDescriptor.expressionsMenu = (ExpressionsMenu)AssetDatabase.LoadAssetAtPath(menuSavePath, typeof(ExpressionsMenu));
+            }
+            else
+            {
+                ExpressionsMenu defaultMenu = (ExpressionsMenu)AssetDatabase.LoadAssetAtPath(pathDefaultExpressionsMenu, typeof(ExpressionsMenu));
+                ExpressionsMenu newMenu = (ExpressionsMenu)GameObject.Instantiate(defaultMenu);
+                EditorUtility.SetDirty(newMenu);
+                AssetDatabase.CreateAsset(newMenu, pathMenu);
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+                AssetDatabase.ImportAsset(pathMenu, ImportAssetOptions.ForceUpdate);
+                avatarDescriptor.expressionsMenu = (ExpressionsMenu)AssetDatabase.LoadAssetAtPath(pathMenu, typeof(ExpressionsMenu));
             }
 
-            RuntimeAnimatorController runtimeController = animator.runtimeAnimatorController;
-            if (runtimeController == null)
+            // Backup AnimatorController
+            for(int i = 0; i < avatarDescriptor.baseAnimationLayers.Length; i++)
             {
-                EditorUtility.DisplayDialog("Animator has no AnimatorController.",
-                    "Add an AnimatorController to the Animator component.",
-                    "Ok");
-                return null;
+                if (avatarDescriptor.baseAnimationLayers[i].type == VRCAvatarDescriptor.AnimLayerType.FX)
+                {
+                    if(avatarDescriptor.baseAnimationLayers[i].animatorController != null)
+                    {
+                        string controllerPath = AssetDatabase.GetAssetPath(avatarDescriptor.baseAnimationLayers[i].animatorController);
+                        string controllerSavePath = Path.GetDirectoryName(controllerPath) + "/" + Path.GetFileNameWithoutExtension(controllerPath) + additionalName + ".controller";
+                        copiedController = (AnimatorController)Instantiate(avatarDescriptor.baseAnimationLayers[i].animatorController);
+                        EditorUtility.SetDirty(copiedController);
+                        AssetDatabase.CreateAsset(copiedController, controllerSavePath);
+                        AssetDatabase.SaveAssets();
+                        AssetDatabase.Refresh();
+                        AssetDatabase.ImportAsset(controllerSavePath, ImportAssetOptions.ForceUpdate);
+                        avatarDescriptor.baseAnimationLayers[i].animatorController = (AnimatorController)AssetDatabase.LoadAssetAtPath(controllerSavePath, typeof(AnimatorController));
+                    }
+                    else
+                    {
+                        AnimatorController defaultCont = (AnimatorController)AssetDatabase.LoadAssetAtPath(pathDefaultAnimationController, typeof(AnimatorController));
+                        AnimatorController newCont = (AnimatorController)Instantiate(defaultCont);
+                        EditorUtility.SetDirty(newCont);
+                        AssetDatabase.CreateAsset(newCont, pathController);
+                        AssetDatabase.SaveAssets();
+                        AssetDatabase.Refresh();
+                        AssetDatabase.ImportAsset(pathController, ImportAssetOptions.ForceUpdate);
+                        avatarDescriptor.baseAnimationLayers[i].animatorController = (AnimatorController)AssetDatabase.LoadAssetAtPath(pathController, typeof(AnimatorController));
+                    }
+                }
             }
 
-            AnimatorController controller = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEditor.Animations.AnimatorController>(UnityEditor.AssetDatabase.GetAssetPath(runtimeController));
-            if (controller == null)
-            {
-                EditorUtility.DisplayDialog("Could not get AnimatorController.",
-                    "This shouldn't happen... don't know why this would happen.",
-                    "Ok");
-                return null;
-            }
-
-            return controller;
+            return copiedController;
         }
 
         public void EncryptAvatar()
         {
-            ValidateAnimatorController();
-
             // Disable old for convienence.
             gameObject.SetActive(false);
 
-            string newName = gameObject.name + "_Encrypted";
+            string newName = gameObject.name + additionalName;
 
             // delete old GO, do as such in case its disabled
             Scene scene = SceneManager.GetActiveScene();
@@ -111,6 +192,8 @@ namespace GeoTetra.GTAvaCrypt
             encodedGameObject.name = newName;
             encodedGameObject.SetActive(true);
 
+            ValidateAnimatorController(encodedGameObject);
+
             MeshFilter[] meshFilters = encodedGameObject.GetComponentsInChildren<MeshFilter>(true);
             foreach (MeshFilter meshFilter in meshFilters)
             {
@@ -120,7 +203,7 @@ namespace GeoTetra.GTAvaCrypt
 
                     foreach (var Material in Materials)
                     {
-                        if (Material.HasProperty("_Key0"))
+                        if (Material.HasProperty("_Keys") && Material.HasProperty("_IgnoreEncryption") && Material.GetFloat("_IgnoreEncryption") == 0.0f)
                         {
                             meshFilter.sharedMesh = _avaCryptMesh.EncryptMesh(meshFilter.sharedMesh, _key0, _key1, _key2, _key3, _distortRatio);
                             break;
@@ -136,7 +219,7 @@ namespace GeoTetra.GTAvaCrypt
 
                 foreach (var Material in Materials)
                 {
-                    if (Material.HasProperty("_Key0"))
+                    if (Material.HasProperty("_Keys") && Material.HasProperty("_IgnoreEncryption") && Material.GetFloat("_IgnoreEncryption") == 0.0f)
                     {
                         skinnedMeshRenderer.sharedMesh = _avaCryptMesh.EncryptMesh(skinnedMeshRenderer.sharedMesh, _key0, _key1, _key2, _key3, _distortRatio);
                         break;
