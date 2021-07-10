@@ -6,12 +6,13 @@ This is a fork of [GeoTetr​​a AvaCrypt](https://github.com/rygo6/GTAvaCrypt)
 ## Warning
 It could break the blendshape.  
 Meshes containing materials with `_IgnoreEncryption` turned on will not be encrypted, so it is recommended to turn it on for materials with blendshapes.  
-Also, "Shaders" and "Custom Animations" must be turned on in the safety setting to display the avatar correctly.
+Also, `Shaders` and `Custom Animations` must be turned on in the safety setting to display the avatar correctly.
 
 ## Usage
-1. Add the `AvaCryptRoot` component onto the root GameObject of your avatar, next to the `VRCAvatarDescriptor` component. Take note of the four "Key" values which are shown in this component, these are the values you must enter into your Avatar 3.0 puppeting menu.
-2. On the `AvaCryptRoot` component click the `Encrypt Avatar` button.
-3. `Build and Publish` your avatar which has `_Encrypted` appended to the name.
+1. Change to shaders that support AvaterEncryption.
+2. Add the `AvaCryptRoot` component onto the root GameObject of your avatar, next to the `VRCAvatarDescriptor` component. Take note of the four "Key" values which are shown in this component, these are the values you must enter into your Avatar 3.0 puppeting menu.
+3. On the `AvaCryptRoot` component click the `Encrypt Avatar` button.
+4. `Build and Publish` your avatar which has `_Encrypted` appended to the name.
 
 # 日本語
 これは[GeoTetr​​a AvaCrypt](https://github.com/rygo6/GTAvaCrypt)を自動化したフォークです。
@@ -19,9 +20,10 @@ Also, "Shaders" and "Custom Animations" must be turned on in the safety setting 
 ## 注意
 ブレンドシェイプが壊れる可能性があります。  
 `_IgnoreEncryption`がオンになったメッシュを含むマテリアルでは暗号化が実行されないため、ブレンドシェイプを含むマテリアルではオンにすることをオススメします。
-また、アバターを正しく表示するためにセーフティーで"Shaders"と"Custom Animations"がオンになっている必要があります。
+また、アバターを正しく表示するためにセーフティーで`Shaders`と`Custom Animations`がオンになっている必要があります。
 
 ## 使い方
-1. `AvaCryptRoot`コンポーネントを`VRCAvatarDescriptor`と同一階層にアバターのルートに追加してください。コンポーネント内の4つのキーをAvatar 3.0のメニューで入力することで復号化されます。
-2. `AvaCryptRoot`コンポーネントの`Encrypt Avatar`をクリックしてください。
-3. 名前に`_Encrypted`が追加されたアバターをアップロードしてください。
+1. AvaterEncryptionに対応したシェーダーに変更する
+2. `AvaCryptRoot`コンポーネントを`VRCAvatarDescriptor`と同一階層（アバターのルート）に追加してください。コンポーネント内の4つのキーをAvatar 3.0のメニューで入力することで復号化されます。
+3. `AvaCryptRoot`コンポーネントの`Encrypt Avatar`をクリックしてください。
+4. 名前に`_Encrypted`が追加されたアバターをアップロードしてください。
