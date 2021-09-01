@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -7,11 +8,31 @@ namespace GeoTetra.GTAvaCrypt
 {
     public class AvaCryptMesh
     {
+        public static readonly Dictionary<string, Mesh> EncryptedMeshes = new Dictionary<string, Mesh>();
+    
         public Mesh EncryptMesh(Mesh mesh, float key0, float key1, float key2, float key3, float distortRatio)
         {
             if (mesh == null || !mesh.isReadable)
             {
                 return null;
+            }
+            
+            var existingMeshPath = AssetDatabase.GetAssetPath(mesh);
+            if (string.IsNullOrEmpty(existingMeshPath) || existingMeshPath.Contains("unity default resources"))
+            {
+                Debug.LogError("Asset For Mesh Not Found, Invalid Or Is A Built In Unity Mesh!");
+                return null;
+            }
+            
+            Debug.Log($"Existing Mesh Path For {mesh.name} Is {existingMeshPath}");
+            
+            // Do Not Care What File Type The Mesh Is, Attempt Anyway.
+            // The Inline If Statement Is A Fallback Check, It Gets The Path Combined With The Filename Without Extension With Our Own Extension, If The Path Is Null, It Would Then Use Enviroment.CurrentDirectory Via Inheritance As The Path.
+            var encryptedMeshPath = Path.GetDirectoryName(existingMeshPath) != null ? (Path.Combine(Path.GetDirectoryName(existingMeshPath), Path.GetFileNameWithoutExtension(existingMeshPath)) + $"_{mesh.name}_Encrypted.asset") : (Path.GetFileNameWithoutExtension(existingMeshPath) +$"_{mesh.name}_Encrypted.asset");
+
+            if (EncryptedMeshes.ContainsKey(encryptedMeshPath))
+            {
+                return EncryptedMeshes[encryptedMeshPath];
             }
 
             var newVertices = mesh.vertices;
@@ -48,21 +69,7 @@ namespace GeoTetra.GTAvaCrypt
                 newVertices[v] += normals[v] * uv8Offsets[v].x * comKey2;
                 newVertices[v] += normals[v] * uv8Offsets[v].y * comKey3;
             }
-
-            var existingMeshPath = AssetDatabase.GetAssetPath(mesh);
-
-            if (string.IsNullOrEmpty(existingMeshPath) || existingMeshPath.Contains("unity default resources"))
-            {
-                Debug.LogError("Asset For Mesh Not Found, Invalid Or Is A Built In Unity Mesh!");
-                return null;
-            }
-
-            Debug.Log($"Existing Mesh Path For {mesh.name} Is {existingMeshPath}");
-
-            //Do Not Care What File Type The Mesh Is, Attempt Anyway.
-            //The Inline If Statement Is A Fallback Check, It Gets The Path Combined With The Filename Without Extension With Our Own Extension, If The Path Is Null, It Would Then Use Enviroment.CurrentDirectory Via Inheritance As The Path.
-            var encryptedMeshPath = Path.GetDirectoryName(existingMeshPath) != null ? (Path.Combine(Path.GetDirectoryName(existingMeshPath), Path.GetFileNameWithoutExtension(existingMeshPath)) + $"_{mesh.name}_Encrypted.asset") : (Path.GetFileNameWithoutExtension(existingMeshPath) +$"_{mesh.name}_Encrypted.asset");
-
+            
             Debug.Log($"Encrypted Mesh Path {encryptedMeshPath}");
 
             var newMesh = new Mesh
@@ -112,6 +119,7 @@ namespace GeoTetra.GTAvaCrypt
 
             AssetDatabase.CreateAsset(newMesh, encryptedMeshPath);
             AssetDatabase.SaveAssets();
+            EncryptedMeshes.Add(encryptedMeshPath, newMesh);
 
             return newMesh;
         }

@@ -193,7 +193,8 @@ namespace GeoTetra.GTAvaCrypt
             encodedGameObject.SetActive(true);
 
             ValidateAnimatorController(encodedGameObject);
-
+            AvaCryptMesh.EncryptedMeshes.Clear();
+            
             MeshFilter[] meshFilters = encodedGameObject.GetComponentsInChildren<MeshFilter>(true);
             foreach (MeshFilter meshFilter in meshFilters)
             {
